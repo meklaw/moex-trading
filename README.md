@@ -7,7 +7,7 @@
 https://t.me/moex_algopack_signals
 
 Пример сигналов:  
-![img_1.png](img_1.png)
+![img.png](img.png)
 
 #### Инструкция по запуску
 ```
