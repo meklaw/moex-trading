@@ -1,4 +1,7 @@
 use std::env;
+use std::fmt::format;
+use chrono::{Datelike, NaiveDate};
+use linked_hash_map::LinkedHashMap;
 use teloxide::Bot;
 use teloxide::prelude::{ChatId, Requester};
 use tokio::runtime;
@@ -12,28 +15,41 @@ pub struct TestTradingSystem {
     position_price_open: f64,
     bot: Bot,
     chanel_id: i64,
+    // months: Vec<MonthData>
+    months: LinkedHashMap<String, f64>,
+    months_signals: LinkedHashMap<String, f64>,
 }
 
 impl Trade for TestTradingSystem {
     fn new() -> Self {
-        Self { _prev_candel: None, financial_result: 0.0, is_open: false, position_price_open: 0.0, bot: Bot::from_env(), chanel_id: env::var("CHANEL_ID").expect("You need to specify the CHANEL_ID in the telegram").parse().unwrap() }
+        Self {
+            _prev_candel: None,
+            financial_result: 0.0,
+            is_open: false,
+            position_price_open: 0.0,
+            bot: Bot::from_env(),
+            chanel_id: env::var("CHANEL_ID").expect("You need to specify the CHANEL_ID in the telegram").parse().unwrap(),
+            // months: Vec::new(),
+            months: LinkedHashMap::new(),
+            months_signals: LinkedHashMap::new(),
+        }
     }
 
-    fn trade(&mut self, record: CandleTradeStats) {
-        let open_position_predict = record.pr_close > record.pr_open;
-        let close_position_predict = self.is_open;
+    fn trade(&mut self, candle: CandleTradeStats) {
+        if let Ok(date) = NaiveDate::parse_from_str(&*candle.tradedate, "%Y-%m-%d") {
+            let year_month = format!("{}-{}", date.year(), date.month());
 
-
-        if !self.is_open && open_position_predict {
-            self.position_price_open = record.pr_close.unwrap();
-            self.is_open = true;
-            self.send_open_signal(record.secid, record.pr_close.unwrap());
-        } else if self.is_open && close_position_predict {
-            let position_result = record.pr_close.unwrap() - self.position_price_open;
-            self.financial_result += position_result;
-            self.send_close_signal(record.secid, record.pr_close.unwrap());
-            self.is_open = false;
+            match self.months.get(&*year_month) {
+                None => { self.months.insert(year_month, candle.pr_high.unwrap_or_default()); }
+                Some(price) => {
+                    if price > &candle.pr_high.unwrap_or_default() {
+                        self.months.insert(year_month, candle.pr_high.unwrap_or_default());
+                    }
+                }
+            }
         }
+
+        self.calculate_signal(candle);
     }
 }
 
@@ -62,7 +78,34 @@ close long
                 .expect("Error by sending message");
         });
     }
+
+    fn calculate_signal(&mut self, candle: CandleTradeStats) {
+        let last_months_count = 3;
+        if self.months.len() < last_months_count {
+            return;
+        }
+        let max_price = self.months.iter().rev().take(last_months_count).map(|(_, &value)| value).fold(f64::NEG_INFINITY, f64::max);
+        let current_price = candle.pr_low.unwrap();
+
+        if current_price < max_price * 0.8 {
+            if let Ok(date) = NaiveDate::parse_from_str(&*candle.tradedate, "%Y-%m-%d") {
+                let year_month = format!("{}-{}", date.year(), date.month());
+
+                match self.months_signals.get(&*year_month) {
+                    None => {
+                        self.months_signals.insert(year_month, candle.pr_close.unwrap_or_default());
+                        // println!("Дата:{}, время: {}, покупка {} по {}", candle.tradedate, candle.tradetime, candle.secid, current_price);
+                        self.send_message(format!("Дата:{}, время: {}, покупка {} по {}", candle.tradedate, candle.tradetime, candle.secid, current_price));
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
+    }
     pub fn get_financial_result(&self) -> f64 {
         return self.financial_result;
+    }
+    pub fn get_months_result(&self) -> &LinkedHashMap<String, f64> {
+        return &self.months;
     }
 }
