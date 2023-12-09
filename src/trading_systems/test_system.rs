@@ -1,21 +1,18 @@
 use std::env;
-use std::fmt::format;
+
 use chrono::{Datelike, NaiveDate};
 use linked_hash_map::LinkedHashMap;
 use teloxide::Bot;
 use teloxide::prelude::{ChatId, Requester};
 use tokio::runtime;
+
 use crate::models::algopack::candle_trade_stats::CandleTradeStats;
 use crate::traits::trade::Trade;
 
 pub struct TestTradingSystem {
-    _prev_candel: Option<CandleTradeStats>,
     financial_result: f64,
-    is_open: bool,
-    position_price_open: f64,
     bot: Bot,
     chanel_id: i64,
-    // months: Vec<MonthData>
     months: LinkedHashMap<String, f64>,
     months_signals: LinkedHashMap<String, f64>,
 }
@@ -23,13 +20,9 @@ pub struct TestTradingSystem {
 impl Trade for TestTradingSystem {
     fn new() -> Self {
         Self {
-            _prev_candel: None,
             financial_result: 0.0,
-            is_open: false,
-            position_price_open: 0.0,
             bot: Bot::from_env(),
             chanel_id: env::var("CHANEL_ID").expect("You need to specify the CHANEL_ID in the telegram").parse().unwrap(),
-            // months: Vec::new(),
             months: LinkedHashMap::new(),
             months_signals: LinkedHashMap::new(),
         }
@@ -54,21 +47,6 @@ impl Trade for TestTradingSystem {
 }
 
 impl TestTradingSystem {
-    fn send_open_signal(&self, secid: String, price: f64) {
-        let formatted_string = format!(r#"
-open long
-{} by {}
-"#, secid, price);
-
-        self.send_message(formatted_string);
-    }
-    fn send_close_signal(&self, secid: String, price: f64) {
-        let formatted_string = format!(r#"
-close long
-{} by {}
-"#, secid, price);
-        self.send_message(formatted_string);
-    }
 
     fn send_message(&self, message: String) {
         runtime::Runtime::new().unwrap().block_on(async {
@@ -94,7 +72,7 @@ close long
                 match self.months_signals.get(&*year_month) {
                     None => {
                         self.months_signals.insert(year_month, candle.pr_close.unwrap_or_default());
-                        // println!("Дата:{}, время: {}, покупка {} по {}", candle.tradedate, candle.tradetime, candle.secid, current_price);
+                        println!("Дата:{}, время: {}, покупка {} по {}", candle.tradedate, candle.tradetime, candle.secid, current_price);
                         self.send_message(format!("Дата:{}, время: {}, покупка {} по {}", candle.tradedate, candle.tradetime, candle.secid, current_price));
                     }
                     Some(_) => {}

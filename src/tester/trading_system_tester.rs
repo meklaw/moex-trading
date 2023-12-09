@@ -11,10 +11,9 @@ pub fn test() {
     // let file_path = "algopack_data/tradestats_2023.csv";
     let start_time = Instant::now();
     let file = File::open(file_path).expect("File open error");
-    let mut rdr = csv::Reader::from_reader(file);
-    // let mut  rdr = csv::ReaderBuilder::new()
-    //     .delimiter(b';')  // Указываем разделитель
-    //     .from_reader(file);
+    let mut  rdr = csv::ReaderBuilder::new()
+        .delimiter(b',')  // Указываем разделитель
+        .from_reader(file);
     let mut ts = TestTradingSystem::new();
 
 
