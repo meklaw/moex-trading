@@ -65,7 +65,7 @@ impl TestTradingSystem {
         let max_price = self.months.iter().rev().take(last_months_count).map(|(_, &value)| value).fold(f64::NEG_INFINITY, f64::max);
         let current_price = candle.pr_low.unwrap();
 
-        if current_price < max_price * 0.8 {
+        if current_price < max_price * 0.8 && candle.val.unwrap() > 10000000.0 {
             if let Ok(date) = NaiveDate::parse_from_str(&*candle.tradedate, "%Y-%m-%d") {
                 let year_month = format!("{}-{}", date.year(), date.month());
 
